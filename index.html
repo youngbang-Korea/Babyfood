@@ -1,0 +1,837 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>이유식 달력</title>
+<meta name="theme-color" content="#F2F5F0" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#131915" media="(prefers-color-scheme: dark)">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<style>
+:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+body{margin:0;font:14px system-ui,-apple-system,sans-serif;-webkit-tap-highlight-color:transparent}
+img{max-width:100%}
+[hidden]{display:none!important}
+</style>
+<script>window.familyDB = new Promise(r => { window.__resolveDB = r; });</script>
+<script type="module" src="app.js"></script>
+</head>
+<body>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Jua&family=IBM+Plex+Sans+KR:wght@400;500;600&display=swap">
+<style>
+/* Layout: 한 달 달력(날짜마다 아침·간식·저녁 칸) 위, 고른 날의 상세 아래, 재료 서랍은 모바일 하단 / 데스크톱 오른쪽 */
+:root{
+  --bg:#F2F5F0; --surface:#FFFFFF; --ink:#1F2B25; --muted:#66756C; --line:#DAE2DA;
+  --accent:#E2703A; --accent-soft:#FCE9DE;
+  --good:#258A4E; --good-bg:#DDF2E4; --bad:#CF3B33; --bad-bg:#FBE3E0;
+  --c-grain:#EEE3C7; --c-veg:#D3EACC; --c-fruit:#FBE2B4; --c-protein:#F5D2CE; --c-mush:#E4DDD2;
+  --sun:#CF3B33; --sat:#2F63B8; --milk:#5B87B8;
+  --f-display:"Jua","IBM Plex Sans KR",system-ui,sans-serif;
+  --f-body:"IBM Plex Sans KR",system-ui,-apple-system,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#131915; --surface:#1B231E; --ink:#E5EDE7; --muted:#93A399; --line:#2C3731;
+  --accent:#F08A55; --accent-soft:#3A2619;
+  --good:#5CC283; --good-bg:#1C3324; --bad:#F06C63; --bad-bg:#3B201E;
+  --c-grain:#4A4231; --c-veg:#2C452F; --c-fruit:#4D3D20; --c-protein:#4A2C2A; --c-mush:#3B352E;
+  --sun:#F06C63; --sat:#7EA6EC; --milk:#8DB4E2; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#131915; --surface:#1B231E; --ink:#E5EDE7; --muted:#93A399; --line:#2C3731;
+  --accent:#F08A55; --accent-soft:#3A2619;
+  --good:#5CC283; --good-bg:#1C3324; --bad:#F06C63; --bad-bg:#3B201E;
+  --c-grain:#4A4231; --c-veg:#2C452F; --c-fruit:#4D3D20; --c-protein:#4A2C2A; --c-mush:#3B352E;
+  --sun:#F06C63; --sat:#7EA6EC; --milk:#8DB4E2; color-scheme:dark}
+
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:14px;line-height:1.5}
+body.dragging{user-select:none;-webkit-user-select:none;cursor:grabbing}
+.app{max-width:1180px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:16px calc(var(--panel-h,260px) + 20px);display:grid;gap:16px}
+.main{min-width:0;display:grid;gap:14px;align-content:start}
+.side{min-width:0;display:grid;gap:14px;align-content:start}
+
+.top{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.top h1{font-family:var(--f-display);font-weight:400;font-size:26px;margin:0;letter-spacing:-.01em}
+.top h1 small{display:block;font-family:var(--f-body);font-size:12px;color:var(--muted);letter-spacing:0}
+.mnav{display:flex;align-items:center;gap:6px}
+.mnav strong{font-family:var(--f-display);font-weight:400;font-size:20px;min-width:7.5em;text-align:center;font-variant-numeric:tabular-nums}
+.btn{font:inherit;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:10px;padding:6px 11px;cursor:pointer}
+.btn:hover{border-color:var(--muted)}
+.btn.sm{font-size:12px;padding:4px 10px;white-space:nowrap}
+.btn:focus-visible,.pc:focus-visible,.day:focus-visible,.tab:focus-visible,.scard:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.btn.icon{width:36px;height:36px;padding:0;font-size:18px;line-height:1}
+
+.sync{font-size:11.5px;font-weight:600;border-radius:999px;padding:3px 9px;white-space:nowrap}
+.sync.on{background:var(--good-bg);color:var(--good)}
+.sync.local{background:var(--bg);color:var(--muted);border:1px solid var(--line)}
+.sync.ro{background:var(--accent-soft);color:var(--accent)}
+.mnav{flex-wrap:wrap}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--surface)}
+.segb{font:inherit;border:0;background:transparent;color:var(--muted);padding:6px 13px;cursor:pointer}
+.segb[aria-pressed="true"]{background:var(--ink);color:var(--surface)}
+.segb:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+/* 주간 보기: 하루 칸이 크게 */
+.grid.week .day{min-height:var(--rowh,360px)}
+.grid.week .slot{min-height:40px;padding:3px 4px;flex-direction:column;gap:3px}
+.grid.week .slots{gap:5px}
+.grid.week .sl{width:auto;text-align:left;font-size:12px;line-height:1.3}
+.grid.week .sl::after{content:attr(data-full)}
+.grid.week .sc{gap:3px}
+.grid.week .c{white-space:normal}
+.banner{display:flex;align-items:center;justify-content:space-between;gap:10px;background:var(--accent-soft);border-radius:12px;padding:9px 12px;font-size:13px}
+
+/* 달력 */
+.cal{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:8px;min-width:0}
+.wk,.grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px}
+.wk div{text-align:center;font-size:11px;font-weight:600;color:var(--muted);padding:2px 0 6px}
+.wk div:first-child{color:var(--sun)} .wk div:last-child{color:var(--sat)}
+.day{border-radius:10px;padding:4px 3px 5px;background:var(--bg);border:1.5px solid transparent;display:flex;flex-direction:column;gap:3px;min-width:0;cursor:pointer}
+.day.blank{background:transparent;cursor:default}
+.dhead{display:flex;align-items:center;gap:3px;padding:0 1px;min-height:18px}
+.dnum{font-size:12px;font-weight:600;font-variant-numeric:tabular-nums}
+.day.sun .dnum{color:var(--sun)} .day.sat .dnum{color:var(--sat)}
+.day.today .dnum{background:var(--accent);color:#fff;border-radius:999px;padding:0 6px}
+.day.sel{border-color:var(--ink)}
+.feed{margin-left:auto;display:inline-flex;align-items:center;gap:1px;font-size:10px;font-weight:600;color:var(--milk);font-variant-numeric:tabular-nums}
+.feed svg{width:9px;height:11px}
+.mark{width:13px;height:13px;border-radius:50%;font-size:9px;font-weight:700;display:grid;place-items:center;line-height:1;flex:none}
+.mark:empty{display:none}
+.st-bad .mark{background:var(--bad);color:#fff}
+.st-good .mark{background:var(--good);color:#fff}
+.slots{display:flex;flex-direction:column;gap:2px;min-width:0}
+.slot{display:flex;gap:2px;align-items:flex-start;min-height:16px;border-radius:5px;padding:1px 2px 1px 1px;background:var(--surface);min-width:0;border:1px dashed transparent}
+.slot.empty{background:transparent;border-color:var(--line)}
+.slot.bad{box-shadow:inset 2px 0 0 var(--bad)}
+.slot.good{box-shadow:inset 2px 0 0 var(--good)}
+.sl{font-size:9px;color:var(--muted);flex:none;width:10px;text-align:center;line-height:15px}
+.slot.snack .sl{color:var(--accent)}
+.sc{display:flex;flex-wrap:wrap;gap:2px;min-width:0;flex:1}
+.over{outline:2px dashed var(--accent);outline-offset:-1px;background:var(--accent-soft)!important}
+.c{display:block;max-width:100%;font-size:10.5px;line-height:1.4;padding:0 3px;border-radius:4px;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;touch-action:none;cursor:grab;user-select:none;-webkit-user-select:none}
+.c.isbad{box-shadow:inset 0 0 0 1.5px var(--bad)}
+.ins-l{box-shadow:-4px 0 0 0 var(--accent)!important} .ins-r{box-shadow:4px 0 0 0 var(--accent)!important}
+.ins-t{box-shadow:0 -4px 0 0 var(--accent)!important} .ins-b{box-shadow:0 4px 0 0 var(--accent)!important}
+.dragsrc{opacity:.3}
+.cat-grain{background:var(--c-grain)} .cat-veg{background:var(--c-veg)} .cat-fruit{background:var(--c-fruit)} .cat-protein{background:var(--c-protein)} .cat-mush{background:var(--c-mush)}
+
+/* 상세 */
+.detail{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:14px 16px;display:grid;gap:14px}
+.dtop{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.detail h2{font-family:var(--f-display);font-weight:400;font-size:20px;margin:0}
+.pill{font-size:12px;font-weight:600;border-radius:999px;padding:2px 9px;white-space:nowrap}
+.pill.good{background:var(--good-bg);color:var(--good)} .pill.bad{background:var(--bad-bg);color:var(--bad)} .pill.none{background:var(--bg);color:var(--muted)}
+.cfg{display:grid;gap:10px;background:var(--bg);border-radius:12px;padding:12px}
+.cfg h3,.slotsec h3{margin:0;font-size:13px;font-weight:600;color:var(--muted)}
+.steps{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.step{display:grid;gap:4px;justify-items:center;background:var(--surface);border-radius:10px;padding:8px 4px}
+.step span{font-size:12px;color:var(--muted)}
+.step .ctl{display:flex;align-items:center;gap:2px}
+.step button{font:inherit;width:28px;height:28px;flex:none;border-radius:50%;border:1px solid var(--line);background:var(--surface);color:var(--ink);font-size:17px;line-height:1;cursor:pointer}
+.step button:disabled{opacity:.35;cursor:default}
+.step b{font-family:var(--f-display);font-weight:400;font-size:21px;min-width:1.3em;text-align:center;font-variant-numeric:tabular-nums}
+.step.milk b{color:var(--milk)}
+.presets{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.presets small{font-size:12px;color:var(--muted);margin-right:2px}
+.preset{font:inherit;font-size:12px;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:999px;padding:3px 10px;cursor:pointer}
+.preset[aria-pressed="true"]{border-color:var(--ink);background:var(--ink);color:var(--surface)}
+.cfgact{display:flex;flex-wrap:wrap;gap:6px}
+.slotsec{display:grid;gap:8px}
+.scard{border:1.5px solid var(--line);border-radius:12px;padding:10px 12px;display:grid;gap:8px;cursor:pointer;background:var(--surface)}
+.scard.active{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.shead{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.shead b{font-size:15px}
+.shead .kind{font-size:12px;color:var(--muted)}
+.shead .tgt{margin-left:auto;font-size:11px;font-weight:600;color:var(--accent)}
+.sitems{display:flex;flex-wrap:wrap;gap:8px;min-height:40px;align-items:center;padding-block:4px}
+.di{display:inline-flex;align-items:center;gap:0;border-radius:999px;padding:3px 3px;font-size:14px;touch-action:none;cursor:grab;user-select:none;-webkit-user-select:none}
+.di .dn{padding:0 2px}
+.di button.mv{font-size:18px;color:var(--ink);opacity:.55}
+.di button.mv:disabled{opacity:.12;cursor:default}
+.di button{font:inherit;border:0;background:transparent;color:var(--muted);width:30px;height:30px;flex:none;border-radius:50%;cursor:pointer;font-size:14px;line-height:1}
+.di button:hover{background:var(--surface);color:var(--bad)}
+.pairs{list-style:none;margin:0;padding:0;display:grid;gap:4px}
+.pairs li{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:5px 9px;border-radius:8px;background:var(--bg);font-size:12.5px}
+.badline{margin:0;font-size:13px;color:var(--bad)}
+.empty{color:var(--muted);font-size:13px;margin:0}
+.note{color:var(--muted);font-size:12px;margin:0}
+
+/* 재료 서랍 */
+.panel{position:fixed;left:0;right:0;bottom:0;z-index:20;background:var(--surface);border-top:1px solid var(--line);box-shadow:0 -6px 24px rgba(0,0,0,.06);transition:transform .18s ease,opacity .18s}
+.pin{position:relative;max-width:1180px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:10px calc(12px + env(safe-area-inset-bottom,0px));display:grid;gap:8px}
+.target{font-size:12.5px;margin:0;display:flex;gap:6px;align-items:baseline;flex-wrap:wrap}
+.target b{color:var(--accent)}
+.target span{color:var(--muted);font-size:11.5px}
+.ptop{display:grid;gap:8px}
+.tabs{display:flex;gap:4px;flex-wrap:wrap}
+.tab{font:inherit;font-size:13px;border:0;border-radius:999px;padding:4px 12px;background:var(--bg);color:var(--muted);cursor:pointer}
+.tab[aria-selected="true"]{background:var(--ink);color:var(--surface)}
+.pal{display:flex;flex-wrap:nowrap;gap:6px;overflow-x:auto;overscroll-behavior-x:contain;scrollbar-width:none;padding-block:2px;margin-inline:-4px;padding-inline:4px;-webkit-mask-image:linear-gradient(90deg,#000 calc(100% - 28px),transparent);mask-image:linear-gradient(90deg,#000 calc(100% - 28px),transparent)}
+.pal::-webkit-scrollbar{display:none}
+.pc{font:inherit;font-size:13px;border:0;border-radius:9px;padding:6px 11px;color:var(--ink);touch-action:pan-x;flex:none;white-space:nowrap;cursor:grab;user-select:none;-webkit-user-select:none}
+#trash{position:absolute;inset:6px max(10px,env(safe-area-inset-left,0px)) calc(6px + env(safe-area-inset-bottom,0px));border:2px dashed var(--bad);border-radius:14px;background:var(--bad-bg);color:var(--bad);display:none;align-items:center;justify-content:center;gap:10px;font-weight:600;font-size:15px}
+#trash svg{width:26px;height:26px}
+body.from-cal #trash{display:flex}
+#trash.over{background:var(--bad)!important;color:#fff;outline:none}
+body.from-pal .panel{transform:translateY(calc(100% - 20px));opacity:.6}
+@media (max-width:0px){ body.from-pal .panel{transform:translateY(calc(100% - 20px));opacity:.6} }
+
+.ghost{position:fixed;left:0;top:0;z-index:50;pointer-events:none;font-size:14px;font-weight:600;padding:6px 12px;border-radius:10px;color:var(--ink);box-shadow:0 6px 18px rgba(0,0,0,.22)}
+.ghost::after{content:"";position:absolute;left:50%;bottom:-7px;width:10px;height:10px;margin-left:-5px;background:var(--accent);border-radius:50%;box-shadow:0 0 0 2px var(--surface)}
+.toast{pointer-events:none;position:fixed;left:50%;transform:translateX(-50%);bottom:calc(var(--panel-h,260px) + 12px);z-index:40;background:var(--ink);color:var(--surface);padding:8px 14px;border-radius:999px;font-size:13px;max-width:calc(100% - 32px);text-align:center}
+.toast.bad{background:var(--bad);color:#fff}
+.toast.good{background:var(--good);color:#fff}
+
+/* 태블릿(세로·가로): 달력이 화면 폭을 꽉 채우고 높이도 화면에 맞춤. 재료 서랍은 아래에 얇게, 상세는 달력 아래 */
+@media (min-width:600px){
+  body{font-size:15px}
+  .app,.pin{max-width:none}
+  .app{padding-block:12px calc(var(--panel-h,200px) + 16px)}
+  .top h1{font-size:26px}
+  .top h1 small{display:none}
+  .banner{padding:6px 12px}
+  .cal{padding:6px}
+  .wk div{font-size:13px;padding-bottom:4px}
+  .grid{grid-auto-rows:minmax(var(--rowh,120px),auto)}
+  .day{padding:6px 6px}
+  .dnum{font-size:15px}
+  .c{font-size:14px;padding:1px 6px;border-radius:5px}
+  .sl{font-size:12px;width:15px;line-height:21px}
+  .slot{min-height:23px;gap:3px}
+  .sc{gap:3px}
+  .feed{font-size:12px}
+  .feed svg{width:10px;height:12px}
+  .mark{width:16px;height:16px;font-size:11px}
+  .pin{padding-block:8px calc(10px + env(safe-area-inset-bottom,0px));gap:6px}
+  .ptop{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+  .pc{font-size:15px;padding:7px 13px}
+  .tab{font-size:14px;padding:5px 14px}
+  .di{font-size:15px}
+  .detail{max-width:900px}
+}
+@media (min-width:600px){ .grid.week .c{font-size:16px;padding:2px 7px} .grid.week .sl{font-size:13px} .grid.week .dnum{font-size:18px} }
+@media (min-width:1100px){ .c{font-size:15px} .dnum{font-size:16px} }
+@media (max-width:599px){ .grid.week .c{font-size:11px;padding:1px 3px;white-space:nowrap} .grid.week .day{min-height:300px} .grid.week .sl{font-size:10px} }
+@media (max-width:420px){ .top h1{font-size:23px} .mnav strong{min-width:6.8em;font-size:18px} }
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+
+<div class="app">
+  <div class="main">
+    <header class="top">
+      <h1>이유식 달력<small>날짜를 누르고, 하루 구성을 정하고, 칸마다 재료를 넣어요</small></h1>
+      <div class="mnav">
+        <button class="btn icon" id="prev" aria-label="이전 달">‹</button>
+        <strong id="mlabel"></strong>
+        <button class="btn icon" id="next" aria-label="다음 달">›</button>
+        <button class="btn" id="todayBtn">오늘</button>
+        <span class="seg"><button class="segb" data-view="month" aria-pressed="true">월</button><button class="segb" data-view="week" aria-pressed="false">주</button></span>
+        <button class="btn" id="fsBtn" hidden>전체 화면</button>
+        <button class="btn" id="acct" hidden></button>
+        <span class="sync local" id="sync">이 기기에만 저장</span>
+      </div>
+    </header>
+    <div class="banner" id="exBanner" hidden>
+      <span>예시 식단이 들어 있어요. 마음껏 옮기고 지워보세요.</span>
+      <button class="btn sm" id="clearEx">예시 지우기</button>
+    </div>
+    <section class="cal" aria-label="월간 달력">
+      <div class="wk"><div>일</div><div>월</div><div>화</div><div>수</div><div>목</div><div>금</div><div>토</div></div>
+      <div class="grid" id="grid"></div>
+    </section>
+  </div>
+
+  <div class="side">
+  <aside class="panel" id="panel">
+    <div class="pin">
+      <div class="ptop"><p class="target" id="target"></p><div class="tabs" id="tabs" role="tablist"></div></div>
+      <div class="pal" id="pal"></div>
+      <div id="trash" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/></svg>
+        여기에 놓으면 삭제
+      </div>
+    </div>
+  </aside>
+  <section class="detail" id="detail" aria-live="polite"></section>
+  </div>
+</div>
+<div class="ghost" id="ghost" hidden></div>
+<div class="toast" id="toast" hidden></div>
+
+<script>
+// ---------- 재료 ----------
+const CATS = {
+  grain:  {label:'곡물',   list:['쌀','찹쌀','오트밀']},
+  veg:    {label:'채소',   list:['감자','고구마','당근','시금치','단호박','애호박','브로콜리','양배추','양파','무','청경채','비타민채','가지','오이','옥수수','부추','비트','배추','콩나물','케일']},
+  fruit:  {label:'과일',   list:['바나나','사과','아보카도','멜론','대추','밤']},
+  protein:{label:'단백질', list:['소고기','닭고기','흰살생선','연어','달걀','두부','치즈','우유']},
+  mush:   {label:'버섯',   list:['양송이버섯','표고버섯','팽이버섯']}
+};
+const SHORT = {'양송이버섯':'양송이','표고버섯':'표고','팽이버섯':'팽이','비타민채':'비타민','흰살생선':'흰살'};
+const CAT_OF = {}; for (const k in CATS) CATS[k].list.forEach(n => CAT_OF[n] = k);
+
+// 큐브데이 「이유식 재료 궁합 – 야채, 과일」 표
+const GOOD = {
+  '감자':['고구마','달걀','닭고기','당근','시금치','양송이버섯','양파','우유','애호박','치즈','흰살생선'],
+  '고구마':['감자','닭고기','당근','사과','우유','밤','양배추','브로콜리'],
+  '당근':['고구마','달걀','닭고기','비트','사과','시금치','소고기','양파','흰살생선'],
+  '시금치':['감자','당근','두유','바나나','사과','소고기','양파','우유','조개','참깨'],
+  '바나나':['멜론','시금치','아보카도','오트밀','우유'],
+  '가지':['팽이버섯'],
+  '단호박':['달걀','닭고기','대추','브로콜리','소고기','시금치','양파','우유'],
+  '무':['닭고기','두부','배추','소고기','찹쌀','흰살생선'],
+  '비타민채':['닭고기','소고기','흰살생선'],
+  '브로콜리':['고구마','게','단호박','닭고기','소고기','아몬드','양파','치즈','호두','흰살생선'],
+  '사과':['고구마','닭고기','당근','양배추','양파','오트밀','케일'],
+  '양배추':['고구마','게','단호박','닭고기','브로콜리','사과','소고기','아몬드','양파','자몽','치즈','파인애플','호두','흰살생선'],
+  '양송이버섯':['감자','소고기'],
+  '양파':['당근','비트','사과','시금치','오미자','콩나물','흰살생선'],
+  '애호박':['감자','달걀','소고기'],
+  '청경채':['닭고기','당근','소고기','양파','연어','표고버섯']
+};
+const BAD = {
+  '감자':['바나나'], '고구마':['땅콩','소고기'], '당근':['무','양배추','오이'],
+  '시금치':['두부','근대','멸치'], '바나나':['감자'],
+  '대추':['대파','무','오이','우유','게','새우'], '부추':['소고기'],
+  '오이':['당근','땅콩','무'], '옥수수':['조개','흰살생선']
+};
+function rel(a,b){
+  if ((BAD[a]||[]).includes(b) || (BAD[b]||[]).includes(a)) return 'bad';
+  if ((GOOD[a]||[]).includes(b) || (GOOD[b]||[]).includes(a)) return 'good';
+  return null;
+}
+function analyze(items){
+  const pairs=[], badSet=new Set(); let good=0, bad=0;
+  for (let i=0;i<items.length;i++) for (let j=i+1;j<items.length;j++){
+    const r = rel(items[i],items[j]); if (!r) continue;
+    pairs.push({a:items[i],b:items[j],r});
+    if (r==='bad'){bad++; badSet.add(items[i]); badSet.add(items[j]);} else good++;
+  }
+  pairs.sort((x,y)=>(x.r==='bad'?0:1)-(y.r==='bad'?0:1));
+  return {pairs,badSet,status: bad?'bad': good?'good':'none'};
+}
+
+// ---------- 하루 구성 (칸) ----------
+// 칸 열쇠: b 아침, s1 오전간식, l 점심, s2 오후간식, d 저녁 — 시간 순서대로
+const ORDER = ['b','s1','l','s2','d'];
+const MEAL_KEYS = {1:['b'], 2:['b','d'], 3:['b','l','d']};
+const SNACK_KEYS = {0:[], 1:['s1'], 2:['s1','s2']};
+const LIMITS = {meals:[1,3], snacks:[0,2], feeds:[0,10]};
+const PRESETS = [
+  {id:'early', label:'초기 4~6개월', cfg:{meals:1,snacks:0,feeds:5}},
+  {id:'mid',   label:'중기 7~8개월', cfg:{meals:2,snacks:1,feeds:4}},
+  {id:'late',  label:'후기 9~11개월', cfg:{meals:3,snacks:2,feeds:3}},
+  {id:'done',  label:'완료기 12개월~', cfg:{meals:3,snacks:2,feeds:2}}
+];
+function slotLabel(s, cfg){
+  if (s==='b') return cfg.meals===1 ? '이유식' : '아침';
+  if (s==='l') return '점심';
+  if (s==='d') return '저녁';
+  if (s==='s1') return cfg.snacks===1 ? '간식' : '오전 간식';
+  return '오후 간식';
+}
+const SLOT_CHAR = {b:'아', l:'점', d:'저', s1:'간', s2:'간'};
+const isSnack = s => s[0]==='s';
+
+// ---------- 상태 ----------
+const pad = n => String(n).padStart(2,'0');
+const key = d => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+const today = new Date(); today.setHours(0,0,0,0);
+const STORE = 'babyfood-calendar-v2';
+let plan = {}, isExample = false, defaultCfg = {meals:2,snacks:1,feeds:4};
+
+function seed(){
+  plan = {}; isExample = true;
+  const ex = [
+    {b:['쌀','감자','당근'], s1:['바나나'], d:['쌀','소고기','애호박']},
+    {b:['쌀','소고기','고구마'], s1:['사과'], d:['쌀','닭고기','브로콜리']},
+    {b:['쌀','단호박','브로콜리'], s1:['고구마'], d:['쌀','시금치','두부']},
+    {b:['쌀','청경채','소고기'], s1:['바나나','감자'], d:['쌀','양배추','닭고기']},
+    {b:['쌀','애호박','달걀'], d:['쌀','무','흰살생선']}
+  ];
+  ex.forEach((slots,i)=>{ const d=new Date(today); d.setDate(d.getDate()+i-2); plan[key(d)] = {slots}; });
+}
+try {
+  const raw = localStorage.getItem(STORE);
+  if (raw){ const s = JSON.parse(raw); plan = s.plan||{}; isExample = !!s.isExample; if (s.defaultCfg) defaultCfg = s.defaultCfg; }
+  else {
+    const old = localStorage.getItem('babyfood-calendar-v1'); // 첫 버전 기록 옮기기
+    if (old){ const o = JSON.parse(old); plan = {}; for (const k in (o.plan||{})) plan[k] = {slots:{b:o.plan[k]}}; isExample = !!o.isExample; }
+    else seed();
+  }
+} catch(e){ seed(); }
+// ---------- 저장: 함께 쓰는 저장소(db)가 있으면 거기, 없으면 이 기기 ----------
+let db = null, shared = false, readOnly = false, loaded = false;
+const synced = {};            // 저장소에 있는 날짜별 내용(JSON)
+let syncedDefault = null;
+const queue = {};
+function localSave(){ try{ localStorage.setItem(STORE, JSON.stringify({plan,isExample,defaultCfg})); }catch(e){} }
+function enqueue(id, job){
+  queue[id] = (queue[id] || Promise.resolve()).then(job).catch(err=>{
+    if (err && err.code === 'invalid_argument'){ readOnly = true; toast('보기 권한만 있어서 저장되지 않았어요', 'bad'); setSync(); }
+    else if (err && err.code === 'quota_exceeded') toast('저장 공간이 가득 찼어요. 지난 식단을 지워주세요', 'bad');
+    else toast('저장하지 못했어요. 잠시 뒤 다시 해주세요', 'bad');
+  });
+}
+function save(){
+  if (!shared){ localSave(); return; }
+  if (readOnly) return;
+  const keys = new Set([...Object.keys(plan), ...Object.keys(synced)]);
+  for (const k of keys){
+    const j = plan[k] ? JSON.stringify(plan[k]) : null;
+    if (j === (synced[k] ?? null)) continue;
+    if (j === null) delete synced[k]; else synced[k] = j;
+    const body = j && JSON.parse(j);
+    enqueue('d'+k, ()=> body ? db.doc('days/'+k).set(body) : db.doc('days/'+k).delete());
+  }
+  const dj = JSON.stringify(defaultCfg);
+  if (dj !== syncedDefault){ syncedDefault = dj; enqueue('settings', ()=> db.doc('settings/main').set({defaultCfg:JSON.parse(dj)})); }
+}
+let pendingRender = false;
+function softRender(){ if (drag){ pendingRender = true; return; } render(); }
+function setSync(){
+  const el = $('sync');
+  el.textContent = !shared ? '이 기기에만 저장' : readOnly ? '보기 전용' : '함께 저장 중';
+  el.className = 'sync ' + (!shared ? 'local' : readOnly ? 'ro' : 'on');
+}
+async function connect(){
+  let d = null;
+  try { d = await (window.familyDB || Promise.resolve(null)); } catch(e){ d = null; }
+  if (!d) { setSync(); return; }
+  db = d;
+  const localPlan = isExample ? {} : plan;  // 이 기기에 있던 실제 기록
+  let first = true;
+  db.collection('days').onSnapshot(snap=>{
+    const next = {};
+    for (const doc of snap.docs){ const b = doc.data(); if (b && b.slots) next[doc.id] = JSON.parse(JSON.stringify(b)); }
+    for (const k in synced) delete synced[k];
+    for (const k in next) synced[k] = JSON.stringify(next[k]);
+    if (!shared){ shared = true; isExample = false; }
+    plan = next; loaded = true; setSync();
+    if (first){
+      first = false;
+      if (snap.empty && Object.keys(localPlan).length){ offerImport(localPlan); }
+    }
+    softRender();
+  }, err=>{ if (!shared){ setSync(); if (err && err.code==='revoked') toast('이 구글 계정은 식단을 볼 권한이 없어요', 'bad'); } else toast('함께 저장 연결이 끊겼어요. 새로고침 해주세요', 'bad'); });
+  db.doc('settings/main').onSnapshot(snap=>{
+    const b = snap.exists && snap.data();
+    if (b && b.defaultCfg){ defaultCfg = {...b.defaultCfg}; syncedDefault = JSON.stringify(defaultCfg); softRender(); }
+  }, ()=>{});
+}
+function offerImport(localPlan){
+  const n = Object.keys(localPlan).length;
+  const bn = $('exBanner');
+  bn.querySelector('span').textContent = `이 기기에 저장해 둔 식단이 ${n}일치 있어요. 함께 쓰는 달력으로 옮길까요?`;
+  const b = $('clearEx'); b.textContent = '옮기기';
+  b.onclick = ()=>{ for (const k in localPlan) if (!plan[k]) plan[k] = localPlan[k]; save(); bn.hidden = true; importOffered = false; render(); toast('식단을 옮겼어요'); };
+  importOffered = true; render();
+}
+let importOffered = false;
+
+const cfgOf = k => (plan[k] && plan[k].cfg) || defaultCfg;
+const slotsOf = k => { const c = cfgOf(k); const act = [...MEAL_KEYS[c.meals], ...SNACK_KEYS[c.snacks]]; return ORDER.filter(s=>act.includes(s)); };
+const itemsOf = (k,s) => (plan[k] && plan[k].slots && plan[k].slots[s]) || [];
+function entry(k){ return plan[k] || (plan[k] = {slots:{}}); }
+function tidy(k){
+  const e = plan[k]; if (!e) return;
+  for (const s in e.slots) if (!e.slots[s].length) delete e.slots[s];
+  if (!Object.keys(e.slots).length && !e.cfg) delete plan[k];
+}
+
+let viewY = today.getFullYear(), viewM = today.getMonth();
+let selected = key(today);
+let activeSlot = slotsOf(selected)[0];
+let activeCat = 'veg';
+function fixActive(){ const ss = slotsOf(selected); if (!ss.includes(activeSlot)) activeSlot = ss[0]; }
+
+const $ = id => document.getElementById(id);
+const grid=$('grid'), detail=$('detail'), pal=$('pal'), tabs=$('tabs'), ghost=$('ghost'), trash=$('trash'), panel=$('panel'), toastEl=$('toast');
+
+function fmtDay(k, short){
+  const [y,m,d] = k.split('-').map(Number);
+  const w = '일월화수목금토'[new Date(y,m-1,d).getDay()];
+  return short ? `${m}월 ${d}일` : `${m}월 ${d}일 ${w}요일`;
+}
+const BOTTLE = '<svg viewBox="0 0 9 12" aria-hidden="true"><path d="M3 0h3v1.5H3zM2 2h5l.6 1.4c.3.6.4 1.2.4 1.8V11a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1V5.2c0-.6.1-1.2.4-1.8z" fill="currentColor"/></svg>';
+
+// ---------- 렌더 ----------
+function dayStatus(k){
+  let st = 'none';
+  for (const s of slotsOf(k)){ const a = analyze(itemsOf(k,s)); if (a.status==='bad') return 'bad'; if (a.status==='good') st='good'; }
+  return st;
+}
+let viewMode = 'month';
+try { if (localStorage.getItem('babyfood-view') === 'week') viewMode = 'week'; } catch(e){}
+let weekStart = (()=>{ const d = new Date(today); d.setDate(d.getDate()-d.getDay()); return d; })();
+function renderCal(){
+  let cells = [];
+  if (viewMode === 'week'){
+    for (let i=0;i<7;i++){ const d = new Date(weekStart); d.setDate(d.getDate()+i); cells.push(d); }
+    const a = cells[0], z = cells[6];
+    $('mlabel').textContent = a.getMonth()===z.getMonth() ? `${a.getMonth()+1}월 ${a.getDate()}~${z.getDate()}일` : `${a.getMonth()+1}/${a.getDate()}~${z.getMonth()+1}/${z.getDate()}`;
+  } else {
+    $('mlabel').textContent = `${viewY}년 ${viewM+1}월`;
+    const first = new Date(viewY,viewM,1).getDay(), days = new Date(viewY,viewM+1,0).getDate();
+    const total = Math.ceil((first+days)/7)*7;
+    for (let i=0;i<total;i++){ const dn = i-first+1; cells.push(dn<1||dn>days ? null : new Date(viewY,viewM,dn)); }
+  }
+  grid.classList.toggle('week', viewMode==='week');
+  document.querySelectorAll('[data-view]').forEach(b=>b.setAttribute('aria-pressed', b.dataset.view===viewMode));
+  let h = '';
+  for (let i=0;i<cells.length;i++){
+    if (!cells[i]){ h += '<div class="day blank"></div>'; continue; }
+    const dn = cells[i].getDate();
+    const k = key(cells[i]);
+    const cfg = cfgOf(k), st = dayStatus(k), dow = i%7;
+    const cls = ['day', dow===0?'sun':'', dow===6?'sat':'', k===key(today)?'today':'', k===selected?'sel':'', st!=='none'?'st-'+st:''].join(' ');
+    const mark = st==='bad' ? '!' : st==='good' ? '✓' : '';
+    let rows = '';
+    for (const s of slotsOf(k)){
+      const items = itemsOf(k,s), a = analyze(items);
+      const chips = items.map(n=>`<span class="c cat-${CAT_OF[n]||'veg'} ${a.badSet.has(n)?'isbad':''}" data-name="${n}" data-date="${k}" data-slot="${s}">${SHORT[n]||n}</span>`).join('');
+      rows += `<div class="slot ${isSnack(s)?'snack':''} ${items.length?'':'empty'} ${a.status!=='none'?a.status:''}" data-date="${k}" data-slot="${s}" title="${slotLabel(s,cfg)}"><span class="sl" data-full="${slotLabel(s,cfg).slice(1)}">${SLOT_CHAR[s]}</span><span class="sc">${chips}</span></div>`;
+    }
+    const feed = cfg.feeds ? `<span class="feed" title="수유 ${cfg.feeds}회">${BOTTLE}${cfg.feeds}</span>` : '';
+    h += `<div class="${cls}" data-date="${k}" tabindex="0" aria-label="${fmtDay(k)}"><div class="dhead"><span class="dnum">${dn}</span>${feed}<span class="mark">${mark}</span></div><div class="slots">${rows}</div></div>`;
+  }
+  grid.innerHTML = h;
+}
+function stepper(field, label, val, cls){
+  const [lo,hi] = LIMITS[field];
+  return `<div class="step ${cls||''}"><span>${label}</span><div class="ctl"><button data-step="${field}" data-d="-1" ${val<=lo?'disabled':''} aria-label="${label} 줄이기">−</button><b>${val}</b><button data-step="${field}" data-d="1" ${val>=hi?'disabled':''} aria-label="${label} 늘리기">+</button></div></div>`;
+}
+function renderDetail(){
+  const k = selected, cfg = cfgOf(k), st = dayStatus(k);
+  const own = !!(plan[k] && plan[k].cfg);
+  const pill = st==='bad' ? '<span class="pill bad">안 맞음</span>' : st==='good' ? '<span class="pill good">잘 맞음</span>' : '';
+  const pid = (PRESETS.find(p=>p.cfg.meals===cfg.meals && p.cfg.snacks===cfg.snacks && p.cfg.feeds===cfg.feeds)||{}).id;
+  let h = `<div class="dtop"><h2>${fmtDay(k)}</h2>${pill}</div>`;
+  h += `<div class="cfg"><h3>하루 구성 ${own?'':'· 기본값 사용 중'}</h3>
+    <div class="steps">${stepper('meals','이유식',cfg.meals)}${stepper('snacks','간식',cfg.snacks)}${stepper('feeds','수유',cfg.feeds,'milk')}</div>
+    <div class="presets"><small>단계별 추천</small>${PRESETS.map(p=>`<button class="preset" data-preset="${p.id}" aria-pressed="${p.id===pid}">${p.label}</button>`).join('')}</div>
+    <div class="cfgact"><button class="btn sm" data-act="default">이 구성을 기본으로</button><button class="btn sm" data-act="week">다음 7일에도 적용</button></div>
+  </div>`;
+  h += '<div class="slotsec"><h3>칸을 누르면 그 칸에 재료가 들어가요 · ‹ › 로 순서를 바꿔요</h3>';
+  for (const s of slotsOf(k)){
+    const items = itemsOf(k,s), a = analyze(items), on = s===activeSlot;
+    const sp = items.length<2 ? '' : a.status==='bad' ? '<span class="pill bad">안 맞음</span>' : a.status==='good' ? '<span class="pill good">잘 맞음</span>' : '';
+    h += `<div class="scard ${on?'active':''}" data-date="${k}" data-slot="${s}" tabindex="0">
+      <div class="shead"><b>${slotLabel(s,cfg)}</b><span class="kind">${isSnack(s)?'간식':'이유식'}</span>${sp}${on?'<span class="tgt">여기에 추가 중</span>':''}</div>
+      <div class="sitems">${items.length ? items.map((n,i)=>`<span class="di cat-${CAT_OF[n]||'veg'}" data-name="${n}" data-date="${k}" data-slot="${s}"><button class="mv" data-mv="-1" data-name="${n}" data-slot="${s}" ${i===0?'disabled':''} aria-label="${n} 앞으로">‹</button><span class="dn">${n}</span><button class="mv" data-mv="1" data-name="${n}" data-slot="${s}" ${i===items.length-1?'disabled':''} aria-label="${n} 뒤로">›</button><button data-del="${n}" data-slot="${s}" aria-label="${n} 빼기">×</button></span>`).join('') : '<span class="empty">재료를 탭하거나 여기로 끌어오세요</span>'}</div>
+      ${(()=>{ const bp = a.pairs.filter(p=>p.r==='bad'); return bp.length ? `<p class="badline">${bp.map(p=>p.a+' + '+p.b).join(', ')}</p>` : ''; })()}
+    </div>`;
+  }
+  h += '</div><p class="note">궁합은 큐브데이 재료 궁합표 기준이고, 같은 칸(한 끼) 안의 재료끼리 비교해요. "안 맞음"은 참고용으로 봐주세요.</p>';
+  detail.innerHTML = h;
+}
+function renderTarget(){
+  $('target').innerHTML = `넣을 곳 <b>${fmtDay(selected,true)} ${slotLabel(activeSlot, cfgOf(selected))}</b><span>탭하면 여기에 추가 · 옆으로 밀어 더 보기 · 위로 끌어 달력에 놓기</span>`;
+}
+function renderPalette(){
+  tabs.innerHTML = Object.entries(CATS).map(([k,c])=>`<button class="tab" role="tab" data-cat="${k}" aria-selected="${k===activeCat}">${c.label}</button>`).join('');
+  pal.innerHTML = CATS[activeCat].list.map(n=>`<button class="pc cat-${activeCat}" data-name="${n}">${n}</button>`).join('');
+}
+function render(){ fixActive(); renderCal(); renderDetail(); renderTarget(); $('exBanner').hidden = !(isExample || importOffered); fitRows(); }
+
+// ---------- 데이터 조작 ----------
+function add(k,s,n,ref,after){
+  const e = entry(k); const list = e.slots[s] || (e.slots[s]=[]);
+  if (list.includes(n)) return false;
+  insertAt(list, n, ref, after); save(); return true;
+}
+function insertAt(list, n, ref, after){
+  const i = ref ? list.indexOf(ref) : -1;
+  if (i < 0) list.push(n); else list.splice(after ? i+1 : i, 0, n);
+}
+function reorder(k,s,n,ref,after){
+  const list = itemsOf(k,s).filter(x=>x!==n);
+  insertAt(list, n, ref, after);
+  entry(k).slots[s] = list; save();
+}
+function removeItem(k,s,n){
+  const e = plan[k]; if (!e || !e.slots[s]) return;
+  e.slots[s] = e.slots[s].filter(x=>x!==n); tidy(k); save();
+}
+function hiddenItems(k, cfg){
+  const act = [...MEAL_KEYS[cfg.meals], ...SNACK_KEYS[cfg.snacks]];
+  return ORDER.filter(s=>!act.includes(s) && itemsOf(k,s).length);
+}
+function setCfg(k, cfg){
+  const before = slotsOf(k);
+  entry(k).cfg = {...cfg}; tidy(k); save();
+  const lost = hiddenItems(k, cfg);
+  if (lost.length) toast(`숨겨진 칸에 재료가 있어요. 횟수를 다시 늘리면 돌아와요`);
+}
+function feedback(k,s,n,verb){
+  const others = itemsOf(k,s).filter(x=>x!==n);
+  const bad = others.filter(o=>rel(n,o)==='bad'), good = others.filter(o=>rel(n,o)==='good');
+  if (bad.length) toast(`${n} + ${bad.join(', ')} 궁합 주의`, 'bad');
+  else if (good.length) toast(`${n} + ${good.join(', ')} 잘 맞아요`, 'good');
+  else toast(`${fmtDay(k,true)} ${slotLabel(s,cfgOf(k))}에 ${n} ${verb}`);
+}
+let toastT;
+function toast(msg, kind){
+  toastEl.textContent = msg; toastEl.className = 'toast' + (kind?' '+kind:''); toastEl.hidden = false;
+  clearTimeout(toastT); toastT = setTimeout(()=>toastEl.hidden=true, 2400);
+}
+
+// ---------- 드래그 (마우스·터치 공통) ----------
+let drag = null, justDragged = false, rafId = 0, overEl = null, insEl = null, zoneSince = 0;
+function startDrag(e, name, from){
+  if (e.button > 0) return;
+  e.preventDefault();
+  drag = {name, from, x0:e.clientX, y0:e.clientY, x:e.clientX, y:e.clientY, moved:false, id:e.pointerId, over:null, tip: e.pointerType==='mouse' ? 0 : 34, src: from ? e.target.closest('.c,.di') : null};
+  try { e.target.setPointerCapture(e.pointerId); } catch(_){}
+}
+function setOver(t, el, chip, cls){
+  if (overEl) overEl.classList.remove('over');
+  if (insEl) insEl.classList.remove('ins-l','ins-r','ins-t','ins-b');
+  drag.over = t; overEl = el || null; insEl = chip || null;
+  if (overEl) overEl.classList.add('over');
+  if (insEl) insEl.classList.add(cls);
+}
+function hit(){
+  const el = document.elementFromPoint(drag.x, drag.y - drag.tip);
+  if (!el) return setOver(null);
+  if (drag.from && el.closest('#trash')) return setOver('trash', trash);
+  const sl = el.closest('[data-slot][data-date]:not(.c):not(.di)') || el.closest('.c,.di')?.parentElement.closest('[data-slot][data-date]');
+  if (sl){
+    const t = {date:sl.dataset.date, slot:sl.dataset.slot};
+    const p = placeIn(sl);
+    if (p){ t.ref = p.ref; t.after = p.after; return setOver(t, sl, p.el, p.cls); }
+    return setOver(t, sl);
+  }
+  const day = el.closest('.day[data-date]');
+  if (day){
+    const k = day.dataset.date, ss = slotsOf(k);
+    const s = (k===selected && ss.includes(activeSlot)) ? activeSlot : (ss.find(x=>!itemsOf(k,x).length) || ss[0]);
+    const row = day.querySelector(`.slot[data-slot="${s}"]`);
+    return setOver({date:k, slot:s}, row || day);
+  }
+  setOver(null);
+}
+// 칸 어디에 놓든 손가락 위치에서 가장 가까운 자리를 찾아 끼워 넣기
+function placeIn(sl){
+  const chips = [...sl.querySelectorAll('.c,.di')].filter(c=>c.dataset.name!==drag.name);
+  if (!chips.length) return null;
+  const rows = [];
+  for (const c of chips){
+    const r = c.getBoundingClientRect();
+    const row = rows.find(w=>Math.abs(w.top - r.top) < r.height/2);
+    if (row){ row.items.push({c,r}); row.bottom = Math.max(row.bottom, r.bottom); }
+    else rows.push({top:r.top, bottom:r.bottom, items:[{c,r}]});
+  }
+  const multi = rows.some(w=>w.items.length>1);
+  const before = c => ({ref:c.dataset.name, after:false, el:c, cls: multi?'ins-l':'ins-t'});
+  const after  = c => ({ref:c.dataset.name, after:true,  el:c, cls: multi?'ins-r':'ins-b'});
+  const y = drag.y - drag.tip, x = drag.x;
+  const row = rows.find(w=>y <= w.bottom);
+  if (!row){ const last = rows[rows.length-1].items; return after(last[last.length-1].c); }
+  if (y < row.top && rows.indexOf(row) > 0){
+    const prev = rows[rows.indexOf(row)-1].items; return after(prev[prev.length-1].c);
+  }
+  if (row.items.length === 1){
+    const {c,r} = row.items[0];
+    return y < r.top + r.height/2 && !multi ? before(c) : (multi ? (x < r.left + r.width/2 ? before(c) : after(c)) : after(c));
+  }
+  for (const {c,r} of row.items) if (x < r.left + r.width/2) return before(c);
+  return after(row.items[row.items.length-1].c);
+}
+function scrollLoop(){
+  if (!drag || !drag.moved) return;
+  let v = 0;
+  if (drag.y < 50) v = -8;
+  else if (true){
+    const limit = drag.from ? panel.getBoundingClientRect().top : innerHeight;
+    if (drag.y > limit - 36 && drag.y < limit) v = 8;
+  } else if (drag.y > innerHeight - 40) v = 8;
+  const now = performance.now();
+  if (!v) zoneSince = 0;
+  else if (!zoneSince) zoneSince = now;
+  else if (now - zoneSince > 450){ window.scrollBy(0, v); hit(); }
+  rafId = requestAnimationFrame(scrollLoop);
+}
+document.addEventListener('touchmove', e=>{ if (drag && drag.moved) e.preventDefault(); }, {passive:false});
+document.addEventListener('pointermove', e=>{
+  if (!drag || e.pointerId !== drag.id) return;
+  drag.x = e.clientX; drag.y = e.clientY;
+  if (!drag.moved){
+    if (Math.hypot(drag.x-drag.x0, drag.y-drag.y0) < 6) return;
+    // 서랍 재료를 옆으로 밀면 넘기기, 위로 끌면 달력에 놓기
+    if (!drag.from && e.pointerType !== 'mouse' && Math.abs(drag.x-drag.x0) > Math.abs(drag.y-drag.y0)){ drag = null; return; }
+    drag.moved = true; toastEl.hidden = true;
+    ghost.textContent = drag.name;
+    ghost.className = 'ghost cat-' + (CAT_OF[drag.name]||'veg');
+    ghost.hidden = false;
+    document.body.classList.add('dragging', drag.from ? 'from-cal' : 'from-pal');
+    if (drag.src) drag.src.classList.add('dragsrc');
+    rafId = requestAnimationFrame(scrollLoop);
+  }
+  ghost.style.transform = `translate(${drag.x}px, ${drag.y - drag.tip}px) translate(-50%, calc(-100% - 7px))`;
+  hit();
+});
+function endDrag(e){
+  if (!drag || e.pointerId !== drag.id) return;
+  const d = drag; const target = d.over;
+  setOver(null); drag = null;
+  cancelAnimationFrame(rafId); zoneSince = 0;
+  ghost.hidden = true;
+  document.body.classList.remove('dragging','from-cal','from-pal'); pendingRender = false;
+  if (!d.moved && e.type === 'pointercancel') return;   // 옆으로 밀어 서랍을 넘긴 경우
+  if (d.moved){
+    justDragged = true; setTimeout(()=>justDragged=false, 60);
+    if (e.type === 'pointercancel') return;
+    if (target === 'trash'){ removeItem(d.from.date, d.from.slot, d.name); toast(`${d.name} 삭제했어요`); }
+    else if (target && d.from && d.from.date===target.date && d.from.slot===target.slot){
+      reorder(target.date, target.slot, d.name, target.ref, target.after);
+      selected = target.date; activeSlot = target.slot;
+      toast('순서를 바꿨어요');
+    }
+    else if (target){
+      if (!add(target.date, target.slot, d.name, target.ref, target.after)) toast(`${d.name}은(는) 이미 그 칸에 있어요`);
+      else {
+        if (d.from) removeItem(d.from.date, d.from.slot, d.name);
+        selected = target.date; activeSlot = target.slot;
+        feedback(target.date, target.slot, d.name, d.from ? '옮김' : '추가');
+      }
+    }
+  } else {
+    if (d.btn) return;
+    if (d.from){ selected = d.from.date; activeSlot = d.from.slot; }
+    else { fixActive(); if (!add(selected, activeSlot, d.name)) toast(`${d.name}은(는) 이미 그 칸에 있어요`); else feedback(selected, activeSlot, d.name, '추가'); }
+  }
+  render();
+}
+document.addEventListener('pointerup', endDrag);
+document.addEventListener('pointercancel', endDrag);
+
+// 칩에서 터치 시작하면 화면 스크롤 대신 끌기
+[grid, pal, detail].forEach(el=>el.addEventListener('touchstart', e=>{
+  if (e.target.closest('button[data-del],button[data-mv]')) return;
+  if (e.target.closest('.c,.di')) e.preventDefault();
+}, {passive:false}));
+grid.addEventListener('pointerdown', e=>{
+  const c = e.target.closest('.c');
+  if (c) startDrag(e, c.dataset.name, {date:c.dataset.date, slot:c.dataset.slot});
+});
+detail.addEventListener('pointerdown', e=>{
+  const c = e.target.closest('.di');
+  if (!c) return;
+  // 버튼 위에서 시작해도 끌면 드래그, 그냥 누르면 버튼 동작
+  const onBtn = !!e.target.closest('button');
+  if (onBtn){ if (e.button > 0) return; drag = {name:c.dataset.name, from:{date:c.dataset.date, slot:c.dataset.slot}, x0:e.clientX, y0:e.clientY, x:e.clientX, y:e.clientY, moved:false, id:e.pointerId, over:null, tip: e.pointerType==='mouse'?0:34, src:c, btn:true}; }
+  else startDrag(e, c.dataset.name, {date:c.dataset.date, slot:c.dataset.slot});
+});
+pal.addEventListener('pointerdown', e=>{
+  const c = e.target.closest('.pc');
+  if (c) startDrag(e, c.dataset.name, null);
+});
+pal.addEventListener('keydown', e=>{
+  const c = e.target.closest('.pc');
+  if (c && (e.key==='Enter' || e.key===' ')){ e.preventDefault(); fixActive(); if (add(selected, activeSlot, c.dataset.name)) feedback(selected, activeSlot, c.dataset.name, '추가'); render(); }
+});
+
+grid.addEventListener('click', e=>{
+  if (justDragged) return;
+  const day = e.target.closest('.day[data-date]'); if (!day) return;
+  selected = day.dataset.date;
+  const sl = e.target.closest('.slot');
+  if (sl) activeSlot = sl.dataset.slot;
+  render();
+});
+grid.addEventListener('keydown', e=>{
+  const day = e.target.closest('.day[data-date]');
+  if (day && (e.key==='Enter' || e.key===' ')){ e.preventDefault(); selected = day.dataset.date; render(); grid.querySelector(`.day[data-date="${selected}"]`)?.focus(); }
+});
+detail.addEventListener('click', e=>{
+  if (justDragged) return;
+  const mv = e.target.closest('[data-mv]');
+  if (mv){
+    const list = itemsOf(selected, mv.dataset.slot).slice(), i = list.indexOf(mv.dataset.name), j = i + Number(mv.dataset.mv);
+    if (i>=0 && j>=0 && j<list.length){ [list[i],list[j]] = [list[j],list[i]]; entry(selected).slots[mv.dataset.slot] = list; save(); render(); }
+    return;
+  }
+  const del = e.target.closest('[data-del]');
+  if (del){ removeItem(selected, del.dataset.slot, del.dataset.del); toast(`${del.dataset.del} 뺐어요`); render(); return; }
+  const st = e.target.closest('[data-step]');
+  if (st){
+    const f = st.dataset.step, c = {...cfgOf(selected)}, [lo,hi] = LIMITS[f];
+    c[f] = Math.min(hi, Math.max(lo, c[f] + Number(st.dataset.d)));
+    setCfg(selected, c); render(); return;
+  }
+  const pr = e.target.closest('[data-preset]');
+  if (pr){ const p = PRESETS.find(x=>x.id===pr.dataset.preset); setCfg(selected, p.cfg); toast(`${p.label} 구성으로 바꿨어요`); render(); return; }
+  const act = e.target.closest('[data-act]');
+  if (act){
+    const c = {...cfgOf(selected)};
+    if (act.dataset.act==='default'){
+      defaultCfg = c;
+      for (const k in plan){ const e2 = plan[k]; if (e2.cfg && e2.cfg.meals===c.meals && e2.cfg.snacks===c.snacks && e2.cfg.feeds===c.feeds){ delete e2.cfg; tidy(k); } }
+      save(); toast('구성을 따로 정하지 않은 날은 모두 이 구성을 써요');
+    } else {
+      const [y,m,d] = selected.split('-').map(Number);
+      for (let i=1;i<=7;i++){ const dt = new Date(y,m-1,d+i); entry(key(dt)).cfg = {...c}; tidy(key(dt)); }
+      save(); toast('다음 7일에 같은 구성을 넣었어요');
+    }
+    render(); return;
+  }
+  const card = e.target.closest('.scard');
+  if (card){ activeSlot = card.dataset.slot; render(); }
+});
+detail.addEventListener('keydown', e=>{
+  const card = e.target.closest('.scard');
+  if (card && e.target===card && (e.key==='Enter' || e.key===' ')){ e.preventDefault(); activeSlot = card.dataset.slot; render(); }
+});
+tabs.addEventListener('click', e=>{
+  const t = e.target.closest('.tab');
+  if (t){ activeCat = t.dataset.cat; renderPalette(); }
+});
+function shift(n){
+  if (viewMode==='week'){ weekStart.setDate(weekStart.getDate()+7*n); }
+  else { viewM += n; if (viewM<0){viewM=11;viewY--;} if (viewM>11){viewM=0;viewY++;} }
+  renderCal(); fitRows();
+}
+$('prev').onclick = ()=>shift(-1);
+$('next').onclick = ()=>shift(1);
+$('todayBtn').onclick = ()=>{ viewY=today.getFullYear(); viewM=today.getMonth(); weekStart = new Date(today); weekStart.setDate(today.getDate()-today.getDay()); selected=key(today); render(); };
+function setView(m){
+  viewMode = m; try{ localStorage.setItem('babyfood-view', m); }catch(e){}
+  const [y,mo,d] = selected.split('-').map(Number), sd = new Date(y,mo-1,d);
+  if (m==='week'){ weekStart = new Date(sd); weekStart.setDate(sd.getDate()-sd.getDay()); }
+  else { viewY = sd.getFullYear(); viewM = sd.getMonth(); }
+  render();
+}
+document.querySelectorAll('[data-view]').forEach(b=>b.onclick = ()=>setView(b.dataset.view));
+$('clearEx').onclick = ()=>{ plan = {}; isExample = false; save(); render(); toast('예시를 지웠어요'); };
+
+function fitRows(){
+  if (innerWidth < 600 && viewMode!=='week'){ document.documentElement.style.removeProperty('--rowh'); return; }
+  const g = grid.getBoundingClientRect(), weeks = Math.max(1, grid.children.length/7);
+  const free = innerHeight - (g.top + window.scrollY) - panel.offsetHeight - 22 - (weeks-1)*4;
+  document.documentElement.style.setProperty('--rowh', Math.max(viewMode==='week'?300:110, Math.floor(free/weeks)) + 'px');
+}
+addEventListener('resize', fitRows);
+new ResizeObserver(()=>{
+  const h = panel.offsetHeight; fitRows();
+  document.documentElement.style.setProperty('--panel-h', h + 'px');
+}).observe(panel);
+
+renderPalette();
+render();
+setSync();
+connect();
+(()=>{ const b = $('fsBtn'), d = document.documentElement;
+  if (matchMedia('(display-mode: standalone)').matches || matchMedia('(display-mode: fullscreen)').matches) return;
+  if (!document.fullscreenEnabled || !d.requestFullscreen) return;
+  b.hidden = false;
+  b.onclick = ()=>{ (document.fullscreenElement ? document.exitFullscreen() : d.requestFullscreen()).catch(()=>{ b.hidden = true; toast('이 화면에서는 전체 화면을 쓸 수 없어요'); }); };
+  document.addEventListener('fullscreenchange', ()=>{ b.textContent = document.fullscreenElement ? '전체 화면 끄기' : '전체 화면'; setTimeout(fitRows, 100); });
+})();
+</script>
+
+<script>
+if ('serviceWorker' in navigator) addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(()=>{}));
+</script>
+</body>
+</html>
