@@ -1,5 +1,5 @@
 // 인터넷이 없어도 어플이 열리게 해 주는 파일. 어플을 고치면 VERSION 숫자를 올린다.
-const VERSION = 'babyfood-v3';
+const VERSION = 'babyfood-v4';
 const SHELL = ['./', 'index.html', 'app.js', 'config.js', 'manifest.webmanifest', 'icons/icon-192.png', 'icons/icon-512.png'];
 
 self.addEventListener('install', (e) => {

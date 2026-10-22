@@ -79,10 +79,13 @@ body.dragging{user-select:none;-webkit-user-select:none;cursor:grabbing}
 .cal{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:8px;min-width:0}
 .wk,.grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px}
 /* 달력 셀: 모든 크기가 em 단위라서 --z(확대 배율) 하나로 함께 커지고 작아짐 */
+/* 원노트처럼: 달력은 글씨가 넉넉한 큰 도화지(고정 크기)이고, 화면 배율로 통째로 키우고 줄임 */
 .calwrap{overflow-x:auto;overflow-y:hidden;touch-action:pan-x pan-y;scrollbar-width:thin}
-.calin{width:calc(100% * var(--z,1));min-width:100%}
-.wk,.grid{font-size:calc(var(--gfs,8.5px) * var(--zf,1))}
-.grid{grid-auto-rows:minmax(var(--rowh,auto),auto)}
+.calin{width:max-content;min-width:1100px}
+.grid{font-size:12px}
+.grid{grid-template-columns:repeat(7,minmax(max-content,1fr));grid-template-rows:auto;grid-auto-rows:minmax(var(--rowh,auto),auto)}
+.wkh{text-align:center;font-size:1.25em;font-weight:600;color:var(--muted);padding:.2em 0 .3em}
+.wkh.sun{color:var(--sun)} .wkh.sat{color:var(--sat)}
 .wk div{text-align:center;font-size:1.25em;font-weight:600;color:var(--muted);padding:.2em 0 .5em}
 .wk div:first-child{color:var(--sun)} .wk div:last-child{color:var(--sat)}
 .day{border-radius:.9em;padding:.4em .3em .45em;background:var(--bg);border:1.5px solid transparent;display:flex;flex-direction:column;gap:.3em;min-width:0;cursor:pointer}
@@ -98,7 +101,7 @@ body.dragging{user-select:none;-webkit-user-select:none;cursor:grabbing}
 .mark:empty{display:none}
 .st-bad .mark{background:var(--bad);color:#fff}
 .st-good .mark{background:var(--good);color:#fff}
-.slots{display:grid;grid-template-columns:repeat(var(--n,3),minmax(0,1fr));gap:.2em;min-width:0;flex:1}
+.slots{display:grid;grid-template-columns:repeat(var(--n,3),minmax(max-content,1fr));gap:.2em;min-width:0;flex:1}
 .slot{display:flex;flex-direction:column;gap:.2em;border-radius:.5em;padding:.2em .15em .3em;background:var(--surface);min-width:0;min-height:3.4em;border:1px dashed transparent}
 .slot.vac{background:transparent;border-color:var(--line)}
 .slot.bad{box-shadow:inset 0 2px 0 var(--bad)}
@@ -107,9 +110,9 @@ body.dragging{user-select:none;-webkit-user-select:none;cursor:grabbing}
 .slot.snack .sl{color:var(--accent)}
 .sc{display:flex;flex-direction:column;gap:.2em;min-width:0}
 .over{outline:2px dashed var(--accent);outline-offset:-1px;background:var(--accent-soft)!important}
-.c{display:block;max-width:100%;font-size:1em;line-height:1.4;padding:0 .2em;border-radius:.35em;color:var(--ink);text-align:center;white-space:normal;word-break:break-all;line-height:1.25;padding-block:.12em;touch-action:none;cursor:grab;user-select:none;-webkit-user-select:none}
+.c{display:block;max-width:100%;font-size:1em;line-height:1.4;padding:0 .2em;border-radius:.35em;color:var(--ink);text-align:center;white-space:nowrap;line-height:1.35;padding:.1em .35em;touch-action:none;cursor:grab;user-select:none;-webkit-user-select:none}
 /* 주간 보기: 같은 구조, 글씨만 크게 */
-.grid.week{font-size:calc(var(--gfs,8.5px) * 1.45 * var(--zf,1))}
+.grid.week{font-size:16px}
 .grid.week .day{min-height:var(--rowh,300px)}
 .grid.week .sl::after{content:attr(data-full)}
 /* 확대·축소 */
@@ -199,7 +202,6 @@ body.from-pal .panel{transform:translateY(calc(100% - 20px));opacity:.6}
   .top h1 small{display:none}
   .banner{padding:6px 12px}
   .cal{padding:6px}
-  :root{--gfs:11px}
   .pin{padding-block:8px calc(10px + env(safe-area-inset-bottom,0px));gap:6px}
   .ptop{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
   .pc{font-size:15px;padding:7px 13px}
@@ -207,7 +209,7 @@ body.from-pal .panel{transform:translateY(calc(100% - 20px));opacity:.6}
   .di{font-size:15px}
   .detail{max-width:900px}
 }
-@media (min-width:1100px){ :root{--gfs:12px} }
+
 @media (max-width:420px){ .top h1{font-size:23px} .mnav strong{min-width:6.8em;font-size:18px} }
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
@@ -233,7 +235,6 @@ body.from-pal .panel{transform:translateY(calc(100% - 20px));opacity:.6}
       <button class="btn sm" id="clearEx">예시 지우기</button>
     </div>
     <section class="cal" aria-label="월간 달력"><div class="calwrap" id="calwrap"><div class="calin">
-      <div class="wk"><div>일</div><div>월</div><div>화</div><div>수</div><div>목</div><div>금</div><div>토</div></div>
       <div class="grid" id="grid"></div>
     </div></div></section>
   </div>
@@ -484,7 +485,7 @@ function renderCal(){
   }
   grid.classList.toggle('week', viewMode==='week');
   document.querySelectorAll('[data-view]').forEach(b=>b.setAttribute('aria-pressed', b.dataset.view===viewMode));
-  let h = '';
+  let h = [...'일월화수목금토'].map((w,i)=>`<div class="wkh ${i===0?'sun':i===6?'sat':''}">${w}</div>`).join('');
   for (let i=0;i<cells.length;i++){
     if (!cells[i]){ h += '<div class="day blank"></div>'; continue; }
     const dn = cells[i].getDate();
@@ -538,7 +539,7 @@ function renderPalette(){
   tabs.innerHTML = Object.entries(CATS).map(([k,c])=>`<button class="tab" role="tab" data-cat="${k}" aria-selected="${k===activeCat}">${c.label}</button>`).join('');
   pal.innerHTML = CATS[activeCat].list.map(n=>`<button class="pc cat-${activeCat}" data-name="${n}">${n}</button>`).join('');
 }
-function render(){ fixActive(); renderCal(); renderDetail(); renderTarget(); $('exBanner').hidden = !(isExample || importOffered); fitRows(); }
+function render(){ fixActive(); renderCal(); renderDetail(); renderTarget(); $('exBanner').hidden = !(isExample || importOffered); try { setZoom(zoom); } catch(e){ fitRows(); } }
 
 // ---------- 데이터 조작 ----------
 function add(k,s,n,ref,after){
@@ -796,7 +797,7 @@ tabs.addEventListener('click', e=>{
 function shift(n){
   if (viewMode==='week'){ weekStart.setDate(weekStart.getDate()+7*n); }
   else { viewM += n; if (viewM<0){viewM=11;viewY--;} if (viewM>11){viewM=0;viewY++;} }
-  renderCal(); fitRows();
+  renderCal(); setZoom(zoom);
 }
 $('prev').onclick = ()=>shift(-1);
 $('next').onclick = ()=>shift(1);
@@ -812,32 +813,48 @@ document.querySelectorAll('[data-view]').forEach(b=>b.onclick = ()=>setView(b.da
 $('clearEx').onclick = ()=>{ plan = {}; isExample = false; save(); render(); toast('예시를 지웠어요'); };
 
 function fitRows(){
-  if (innerWidth < 600 && viewMode!=='week'){ document.documentElement.style.removeProperty('--rowh'); return; }
-  const g = grid.getBoundingClientRect(), weeks = Math.max(1, grid.children.length/7);
-  const free = innerHeight - (g.top + window.scrollY) - panel.offsetHeight - 22 - (weeks-1)*4;
-  document.documentElement.style.setProperty('--rowh', Math.max(viewMode==='week'?300:110, Math.floor(free/weeks)) + 'px');
+  const c = $('calwrap').firstElementChild, sc = Number(c.style.zoom) || 1;
+  const g = $('calwrap').getBoundingClientRect(), weeks = Math.max(1, (grid.children.length-7)/7);
+  const free = (innerHeight - (g.top + window.scrollY) - panel.offsetHeight - 22) / sc - 30 - (weeks-1)*4;
+  document.documentElement.style.setProperty('--rowh', Math.max(viewMode==='week'?320:120, Math.floor(free/weeks)) + 'px');
 }
-addEventListener('resize', fitRows);
+addEventListener('resize', ()=>{ try { setZoom(zoom); } catch(e){} });
 new ResizeObserver(()=>{
   const h = panel.offsetHeight; fitRows();
   document.documentElement.style.setProperty('--panel-h', h + 'px');
 }).observe(panel);
 
 let zoom = 1;
-try { zoom = Math.min(3, Math.max(1, Number(localStorage.getItem('babyfood-zoom')) || 1)); } catch(e){}
-function setZoom(z, cx){
-  const w = $('calwrap'), old = zoom;
-  zoom = Math.round(Math.min(3, Math.max(1, z)) * 20) / 20;
-  document.documentElement.style.setProperty('--z', zoom);
-  document.documentElement.style.setProperty('--zf', Math.sqrt(zoom).toFixed(3));
+try { zoom = Math.min(4, Math.max(1, Number(localStorage.getItem('babyfood-zoom')) || 1)); } catch(e){}
+// zoom = "화면 맞춤" 대비 배율(1 = 한 달이 화면 폭에 딱 맞음)
+function fitScale(){
+  const w = $('calwrap'), c = w.firstElementChild;
+  const prev = c.style.zoom; c.style.zoom = 1;
+  const natural = Math.max(c.getBoundingClientRect().width, c.scrollWidth) + 2;
+  let f = Math.min(1.6, w.clientWidth / natural);
+  // 작은 배율에서는 글자 폭이 반올림돼 살짝 넓어지므로 한두 번 맞춰 줌
+  for (let i=0;i<2;i++){ c.style.zoom = f; const over = w.scrollWidth / w.clientWidth; if (over <= 1.002) break; f = f / over; }
+  c.style.zoom = prev;
+  return f;
+}
+function setZoom(z, cx, cy){
+  const w = $('calwrap'), c = w.firstElementChild, old = zoom;
+  zoom = Math.round(Math.min(4, Math.max(1, z)) * 20) / 20;
+  const fit = fitScale(), sOld = Number(c.style.zoom) || fit, sNew = fit * zoom;
+  const r = w.getBoundingClientRect();
+  c.style.zoom = sNew;
   $('zVal').textContent = Math.round(zoom*100) + '%';
-  $('zOut').disabled = zoom <= 1; $('zIn').disabled = zoom >= 3;
-  if (cx != null && old !== zoom){ const r = w.getBoundingClientRect(), x = cx - r.left; w.scrollLeft = (w.scrollLeft + x) * zoom / old - x; }
+  $('zOut').disabled = zoom <= 1; $('zIn').disabled = zoom >= 4;
+  if (cx != null && sOld !== sNew){
+    const k = sNew / sOld, x = cx - r.left;
+    w.scrollLeft = (w.scrollLeft + x) * k - x;
+    if (cy != null){ const T = r.top + window.scrollY; window.scrollTo(window.scrollX, Math.max(0, T + (window.scrollY + cy - T) * k - cy)); }
+  }
   try { localStorage.setItem('babyfood-zoom', zoom); } catch(e){}
   fitRows();
 }
-$('zIn').onclick = ()=>setZoom(zoom + 0.25, innerWidth/2);
-$('zOut').onclick = ()=>setZoom(zoom - 0.25, innerWidth/2);
+$('zIn').onclick = ()=>setZoom(zoom + 0.5, innerWidth/2);
+$('zOut').onclick = ()=>setZoom(zoom - 0.5, innerWidth/2);
 (()=>{ const w = $('calwrap'); let pinch = null, raf = 0;
   const dist = t => Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
   w.addEventListener('touchstart', e=>{
@@ -850,7 +867,7 @@ $('zOut').onclick = ()=>setZoom(zoom - 0.25, innerWidth/2);
     if (!pinch || e.touches.length !== 2) return;
     e.preventDefault();
     const z = pinch.z * dist(e.touches) / pinch.d, cx = (e.touches[0].clientX + e.touches[1].clientX)/2;
-    cancelAnimationFrame(raf); raf = requestAnimationFrame(()=>setZoom(z, cx));
+    cancelAnimationFrame(raf); const cy = (e.touches[0].clientY + e.touches[1].clientY)/2; raf = requestAnimationFrame(()=>setZoom(z, cx, cy));
   }, {passive:false});
   w.addEventListener('touchend', e=>{ if (e.touches.length < 2) pinch = null; });
 })();
