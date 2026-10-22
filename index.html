@@ -81,7 +81,7 @@ body.dragging{user-select:none;-webkit-user-select:none;cursor:grabbing}
 /* 달력 셀: 모든 크기가 em 단위라서 --z(확대 배율) 하나로 함께 커지고 작아짐 */
 .calwrap{overflow-x:auto;overflow-y:hidden;touch-action:pan-x pan-y;scrollbar-width:thin}
 .calin{width:calc(100% * var(--z,1));min-width:100%}
-.wk,.grid{font-size:calc(var(--gfs,8.5px) * var(--z,1))}
+.wk,.grid{font-size:calc(var(--gfs,8.5px) * var(--zf,1))}
 .grid{grid-auto-rows:minmax(var(--rowh,auto),auto)}
 .wk div{text-align:center;font-size:1.25em;font-weight:600;color:var(--muted);padding:.2em 0 .5em}
 .wk div:first-child{color:var(--sun)} .wk div:last-child{color:var(--sat)}
@@ -107,9 +107,9 @@ body.dragging{user-select:none;-webkit-user-select:none;cursor:grabbing}
 .slot.snack .sl{color:var(--accent)}
 .sc{display:flex;flex-direction:column;gap:.2em;min-width:0}
 .over{outline:2px dashed var(--accent);outline-offset:-1px;background:var(--accent-soft)!important}
-.c{display:block;max-width:100%;font-size:1em;line-height:1.4;padding:0 .2em;border-radius:.35em;color:var(--ink);text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;touch-action:none;cursor:grab;user-select:none;-webkit-user-select:none}
+.c{display:block;max-width:100%;font-size:1em;line-height:1.4;padding:0 .2em;border-radius:.35em;color:var(--ink);text-align:center;white-space:normal;word-break:break-all;line-height:1.25;padding-block:.12em;touch-action:none;cursor:grab;user-select:none;-webkit-user-select:none}
 /* 주간 보기: 같은 구조, 글씨만 크게 */
-.grid.week{font-size:calc(var(--gfs,8.5px) * 1.45 * var(--z,1))}
+.grid.week{font-size:calc(var(--gfs,8.5px) * 1.45 * var(--zf,1))}
 .grid.week .day{min-height:var(--rowh,300px)}
 .grid.week .sl::after{content:attr(data-full)}
 /* 확대·축소 */
@@ -829,6 +829,7 @@ function setZoom(z, cx){
   const w = $('calwrap'), old = zoom;
   zoom = Math.round(Math.min(3, Math.max(1, z)) * 20) / 20;
   document.documentElement.style.setProperty('--z', zoom);
+  document.documentElement.style.setProperty('--zf', Math.sqrt(zoom).toFixed(3));
   $('zVal').textContent = Math.round(zoom*100) + '%';
   $('zOut').disabled = zoom <= 1; $('zIn').disabled = zoom >= 3;
   if (cx != null && old !== zoom){ const r = w.getBoundingClientRect(), x = cx - r.left; w.scrollLeft = (w.scrollLeft + x) * zoom / old - x; }
