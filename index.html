@@ -539,7 +539,16 @@ function renderPalette(){
   tabs.innerHTML = Object.entries(CATS).map(([k,c])=>`<button class="tab" role="tab" data-cat="${k}" aria-selected="${k===activeCat}">${c.label}</button>`).join('');
   pal.innerHTML = CATS[activeCat].list.map(n=>`<button class="pc cat-${activeCat}" data-name="${n}">${n}</button>`).join('');
 }
-function render(){ fixActive(); renderCal(); renderDetail(); renderTarget(); $('exBanner').hidden = !(isExample || importOffered); try { setZoom(zoom); } catch(e){ fitRows(); } }
+function render(){ rememberView(); fixActive(); renderCal(); renderDetail(); renderTarget(); $('exBanner').hidden = !(isExample || importOffered); keepView(); }
+// 재료를 넣거나 옮겨도 보고 있던 위치와 배율을 그대로 둠
+let viewPos = null;
+function keepView(){
+  const w = $('calwrap');
+  if (viewPos){ w.scrollLeft = viewPos.x; window.scrollTo(window.scrollX, viewPos.y); }
+  fitRows();
+  if (viewPos){ w.scrollLeft = viewPos.x; window.scrollTo(window.scrollX, viewPos.y); }
+}
+function rememberView(){ viewPos = {x: $('calwrap').scrollLeft, y: window.scrollY}; }
 
 // ---------- 데이터 조작 ----------
 function add(k,s,n,ref,after){
@@ -801,13 +810,13 @@ function shift(n){
 }
 $('prev').onclick = ()=>shift(-1);
 $('next').onclick = ()=>shift(1);
-$('todayBtn').onclick = ()=>{ viewY=today.getFullYear(); viewM=today.getMonth(); weekStart = new Date(today); weekStart.setDate(today.getDate()-today.getDay()); selected=key(today); render(); };
+$('todayBtn').onclick = ()=>{ viewY=today.getFullYear(); viewM=today.getMonth(); weekStart = new Date(today); weekStart.setDate(today.getDate()-today.getDay()); selected=key(today); render(); setZoom(zoom); };
 function setView(m){
   viewMode = m; try{ localStorage.setItem('babyfood-view', m); }catch(e){}
   const [y,mo,d] = selected.split('-').map(Number), sd = new Date(y,mo-1,d);
   if (m==='week'){ weekStart = new Date(sd); weekStart.setDate(sd.getDate()-sd.getDay()); }
   else { viewY = sd.getFullYear(); viewM = sd.getMonth(); }
-  render();
+  render(); setZoom(zoom);
 }
 document.querySelectorAll('[data-view]').forEach(b=>b.onclick = ()=>setView(b.dataset.view));
 $('clearEx').onclick = ()=>{ plan = {}; isExample = false; save(); render(); toast('예시를 지웠어요'); };
@@ -875,6 +884,7 @@ setZoom(zoom);
 if (normalize()) save();
 renderPalette();
 render();
+setZoom(zoom);
 setSync();
 connect();
 (()=>{ const b = $('fsBtn'), d = document.documentElement;
