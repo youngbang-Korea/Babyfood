@@ -19,7 +19,7 @@ jobs:
         with:
           distribution: temurin
           java-version: 21
-      - uses: android-actions/setup-android@v3
+      # 안드로이드 SDK는 GitHub 서버(ubuntu)에 이미 깔려 있음
       - name: Install
         run: npm ci
       - name: Copy web files into the app
