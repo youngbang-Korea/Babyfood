@@ -6,6 +6,8 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+permissions:
+  contents: write
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -33,6 +35,16 @@ jobs:
         with:
           name: babyfood-test-apk
           path: android/app/build/outputs/apk/debug/app-debug.apk
+      # 휴대폰에서 바로 받을 수 있게 '릴리스'에도 올림 (항상 같은 주소로 최신 파일)
+      - name: Rename APK
+        run: cp android/app/build/outputs/apk/debug/app-debug.apk babyfood.apk
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: test-${{ github.run_number }}
+          name: 테스트 버전 ${{ github.run_number }}
+          body: 태블릿·휴대폰에서 babyfood.apk 를 눌러 받아 설치하세요.
+          files: babyfood.apk
+          make_latest: true
       - name: Prepare signing key
         id: key
         env:
