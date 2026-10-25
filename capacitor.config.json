@@ -1,0 +1,11 @@
+{
+  "appId": "io.github.youngbangkorea.babyfood",
+  "appName": "이유식 달력",
+  "webDir": "www",
+  "android": {
+    "backgroundColor": "#F2F5F0"
+  },
+  "plugins": {
+    "AdMob": {}
+  }
+}

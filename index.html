@@ -10,13 +10,14 @@
 <link rel="icon" href="icons/icon-192.png">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 <style>
-:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+:root{padding-top:calc(env(safe-area-inset-top,0px) + var(--ad-h,0px));padding-bottom:env(safe-area-inset-bottom,0px)}
 body{margin:0;font:14px system-ui,-apple-system,sans-serif;-webkit-tap-highlight-color:transparent}
 img{max-width:100%}
 [hidden]{display:none!important}
 </style>
 <script>window.familyDB = new Promise(r => { window.__resolveDB = r; });</script>
 <script type="module" src="app.js"></script>
+<script src="ads.js"></script>
 </head>
 <body>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Jua&family=IBM+Plex+Sans+KR:wght@400;500;600&display=swap">
@@ -888,6 +889,7 @@ setZoom(zoom);
 setSync();
 connect();
 (()=>{ const b = $('fsBtn'), d = document.documentElement;
+  if (document.documentElement.classList.contains('native')) return;
   if (matchMedia('(display-mode: standalone)').matches || matchMedia('(display-mode: fullscreen)').matches) return;
   if (!document.fullscreenEnabled || !d.requestFullscreen) return;
   b.hidden = false;
@@ -897,7 +899,7 @@ connect();
 </script>
 
 <script>
-if ('serviceWorker' in navigator) addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(()=>{}));
+if ('serviceWorker' in navigator && !document.documentElement.classList.contains('native')) addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(()=>{}));
 </script>
 </body>
 </html>
